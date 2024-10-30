@@ -5,3 +5,6 @@ edition = "2021"
 
 [dependencies]
 winvd = "0.0.46"
+eframe = "0.29.1"
+egui = "0.29.1"
+chrono = "0.4.38"
