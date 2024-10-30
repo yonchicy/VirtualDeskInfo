@@ -8,3 +8,9 @@ winvd = "0.0.46"
 eframe = "0.29.1"
 egui = "0.29.1"
 chrono = "0.4.38"
+[dependencies.windows]
+version = "0.52"
+features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+]
