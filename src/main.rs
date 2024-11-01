@@ -1,9 +1,11 @@
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
+use std::thread::{self, sleep};
+use std::time::Duration;
 use windows::Win32::Foundation::HWND;
+use windows::Win32::System::Threading::GetCurrentProcessId;
 use windows::Win32::UI::Shell::PathParseIconLocationA;
 use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, GetForegroundWindow};
-use windows::Win32::System::Threading::GetCurrentProcessId;
 
 use windows::core::PCWSTR;
 
@@ -54,9 +56,8 @@ fn main() {
         viewport: ViewportBuilder::default().with_decorations(true),
         ..Default::default()
     };
-    println!("pid:{}",unsafe {
-        GetCurrentProcessId()
-    });
+    println!("pid:{}", unsafe { GetCurrentProcessId() });
+
     eframe::run_native(
         "my_app",
         native_options,
@@ -108,7 +109,7 @@ impl eframe::App for MyEguiApp {
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.heading(idx.to_string());
             });
-            ctx.request_repaint();
+            ctx.request_repaint_after(Duration::from_millis(500));
         } else {
             self.hwnd = get_HWND();
             self.inited = true;
