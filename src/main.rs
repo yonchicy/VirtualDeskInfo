@@ -1,7 +1,9 @@
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::Shell::PathParseIconLocationA;
 use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, GetForegroundWindow};
+use windows::Win32::System::Threading::GetCurrentProcessId;
 
 use windows::core::PCWSTR;
 
@@ -52,13 +54,19 @@ fn main() {
         viewport: ViewportBuilder::default().with_decorations(true),
         ..Default::default()
     };
+    println!("pid:{}",unsafe {
+        GetCurrentProcessId()
+    });
     eframe::run_native(
         "my_app",
         native_options,
-        Box::new(|_cc| Ok(Box::new(MyEguiApp::new(rx)))));
+        Box::new(|_cc| Ok(Box::new(MyEguiApp::new(rx)))),
+    );
 }
 
 struct MyEguiApp {
+    inited: bool,
+    hwnd: Option<HWND>,
     receiver: Receiver<DesktopEvent>,
 }
 
@@ -69,6 +77,8 @@ impl MyEguiApp {
         // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
         // for e.g. egui::PaintCallback.
         Self {
+            hwnd: None,
+            inited: false,
             receiver: r,
         }
     }
@@ -76,24 +86,33 @@ impl MyEguiApp {
 
 impl eframe::App for MyEguiApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        if let Ok(new_text) = self.receiver.try_recv() {
-            match new_text {
-                DesktopEvent::DesktopChanged { new, old } => {
-                    println!("Desktop changed from {:?} to {:?}", old, new);
-                    let idx = new.get_index().unwrap();
-                    let hwnd = get_HWND().unwrap();
-                    winvd::move_window_to_desktop(new, &hwnd);
-                    egui::CentralPanel::default().show(ctx, |ui| {
-                        ui.heading(idx.to_string());
-                    });
-                }
-                _ => {}
-            };
+        if self.inited {
+            println!("update");
+            if let Ok(new_text) = self.receiver.try_recv() {
+                match new_text {
+                    DesktopEvent::DesktopChanged { new, old } => {
+                        println!("Desktop changed from {:?} to {:?}", old, new);
+                        let idx = new.get_index().unwrap();
+                        println!("move to new desktop: {}", idx);
+                        winvd::move_window_to_desktop(new, &self.hwnd.unwrap());
+                        egui::CentralPanel::default().show(ctx, |ui| {
+                            ui.heading(idx.to_string());
+                        });
+                    }
+                    event => {
+                        println!("other event:{:?}", event);
+                    }
+                };
+            }
+            let idx = get_current_desktop().unwrap().get_index().unwrap();
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.heading(idx.to_string());
+            });
+            ctx.request_repaint();
+        } else {
+            self.hwnd = get_HWND();
+            self.inited = true;
         }
-        let idx = get_current_desktop().unwrap().get_index().unwrap();
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading(idx.to_string());
-        });
     }
 }
 fn str_to_pcwstr(s: &str) -> Vec<u16> {
@@ -109,8 +128,8 @@ pub fn get_HWND() -> Option<HWND> {
     // 示例：通过窗口标题查找当前应用程序的 HWND
     let mut hwnd: HWND = unsafe {
         FindWindowW(
-            PCWSTR::null(),    // 类名，可选
-            PCWSTR::from_raw(str_to_pcwstr("my_app").as_ptr())
+            PCWSTR::null(), // 类名，可选
+            PCWSTR::from_raw(str_to_pcwstr("my_app").as_ptr()),
         )
     };
 
